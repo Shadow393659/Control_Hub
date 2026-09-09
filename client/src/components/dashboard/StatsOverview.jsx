@@ -1,58 +1,182 @@
 import React from 'react';
-import { Zap, Power, Activity, ShieldCheck } from 'lucide-react';
+import { Zap, Cpu, Layers, Activity, RefreshCw } from 'lucide-react';
 
-export default function StatsOverview({ totalDevices = 0, activeDevices = 0, totalPower = 0, isOnline = true }) {
+export default function StatsOverview({
+  appliances = [],
+  totalDevices = 0,
+  activeDevices = 0,
+  totalPower = 0,
+  isOnline = true,
+  onSync,
+  isSyncing = false,
+}) {
+  // Format power reading: kW
+  const formattedPowerKw = (totalPower / 1000).toFixed(2);
+
+  // Compute active vs total rooms
+  const allRooms = Array.from(new Set(appliances.map((a) => a.room).filter(Boolean)));
+  const totalRoomsCount = allRooms.length || 4;
+  const activeRooms = Array.from(
+    new Set(appliances.filter((a) => a.status).map((a) => a.room).filter(Boolean))
+  );
+  const activeRoomsCount = activeRooms.length;
+
   return (
-    <section className="stats-overview" style={{ marginBottom: '2rem' }}>
-      <div className="grid-cards">
-        {/* Metric 1: Total Devices */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>Connected Devices</span>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-text)' }}>
-              <Power size={18} />
-            </div>
+    <section className="top-metric-ribbon" aria-label="Live System Telemetry">
+      {/* Card 1: Real-time Power Consumption (kW) */}
+      <div className="metric-glass-tile">
+        <div className="metric-tile-header">
+          <span className="metric-tile-label">Power Consumption</span>
+          <div
+            className="metric-tile-icon"
+            style={{
+              background: 'rgba(37, 99, 235, 0.2)',
+              borderColor: 'rgba(37, 99, 235, 0.45)',
+              color: '#1D4ED8',
+            }}
+          >
+            <Zap size={17} strokeWidth={2.6} />
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>{totalDevices}</div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Registered across all rooms</span>
         </div>
-
-        {/* Metric 2: Active Devices */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>Currently Active</span>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--success-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)' }}>
-              <Activity size={18} />
-            </div>
+        <div>
+          <div className="metric-tile-value">
+            {formattedPowerKw} <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1E293B' }}>kW</span>
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>{activeDevices}</div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Powered ON right now</span>
+          <div className="metric-tile-sub">
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: '#10B981',
+                display: 'inline-block',
+                boxShadow: '0 0 8px #10B981',
+              }}
+            />
+            <span style={{ color: '#1E293B', fontWeight: 600 }}>Instantaneous total draw</span>
+          </div>
         </div>
+      </div>
 
-        {/* Metric 3: Total Power Draw */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>Live Power Draw</span>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', backgroundColor: 'var(--warning-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--warning)' }}>
-              <Zap size={18} />
-            </div>
+      {/* Card 2: Active Devices */}
+      <div className="metric-glass-tile">
+        <div className="metric-tile-header">
+          <span className="metric-tile-label">Active Devices</span>
+          <div
+            className="metric-tile-icon"
+            style={{
+              background: 'rgba(16, 185, 129, 0.2)',
+              borderColor: 'rgba(16, 185, 129, 0.45)',
+              color: '#047857',
+            }}
+          >
+            <Cpu size={17} strokeWidth={2.6} />
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>{totalPower} W</div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Instantaneous load</span>
         </div>
-
-        {/* Metric 4: System Health */}
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>Network Status</span>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', backgroundColor: isOnline ? 'var(--success-light)' : 'var(--danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isOnline ? 'var(--success)' : 'var(--danger)' }}>
-              <ShieldCheck size={18} />
-            </div>
+        <div>
+          <div className="metric-tile-value">
+            {activeDevices}{' '}
+            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1E293B' }}>
+              / {totalDevices} On
+            </span>
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 700 }}>{isOnline ? 'Online' : 'Offline'}</div>
-          <span style={{ fontSize: '0.8rem', color: isOnline ? 'var(--success)' : 'var(--danger)' }}>
-            {isOnline ? 'Gateway synchronized' : 'Operating in fallback mode'}
-          </span>
+          <div className="metric-tile-sub">
+            <span style={{ color: '#1E293B', fontWeight: 600 }}>
+              {totalDevices > 0
+                ? `${Math.round((activeDevices / totalDevices) * 100)}% active load ratio`
+                : 'No registered devices'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 3: Live Gateway Status */}
+      <div className="metric-glass-tile">
+        <div className="metric-tile-header">
+          <span className="metric-tile-label">Live Status</span>
+          <div
+            className="metric-tile-icon"
+            style={{
+              background: isOnline ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              borderColor: isOnline ? 'rgba(16, 185, 129, 0.45)' : 'rgba(245, 158, 11, 0.45)',
+              color: isOnline ? '#047857' : '#B45309',
+            }}
+          >
+            <Activity size={17} strokeWidth={2.6} />
+          </div>
+        </div>
+        <div>
+          <div
+            className="metric-tile-value"
+            style={{
+              fontSize: '1.35rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <span
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: '50%',
+                backgroundColor: isOnline ? '#10B981' : '#F59E0B',
+                boxShadow: isOnline ? '0 0 10px #10B981' : '0 0 10px #F59E0B',
+              }}
+            />
+            {isOnline ? 'Online & Synced' : 'Local Standby'}
+          </div>
+          <div className="metric-tile-sub" style={{ justifyContent: 'space-between' }}>
+            <span style={{ color: '#1E293B', fontWeight: 600 }}>Low Latency Telemetry</span>
+            {onSync && (
+              <button
+                type="button"
+                onClick={onSync}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#1D4ED8',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                }}
+              >
+                <RefreshCw size={12} className={isSyncing ? 'spin' : ''} />
+                Sync
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Card 4: Active Zones */}
+      <div className="metric-glass-tile">
+        <div className="metric-tile-header">
+          <span className="metric-tile-label">Active Zones</span>
+          <div
+            className="metric-tile-icon"
+            style={{
+              background: 'rgba(147, 51, 234, 0.2)',
+              borderColor: 'rgba(147, 51, 234, 0.45)',
+              color: '#7E22CE',
+            }}
+          >
+            <Layers size={17} strokeWidth={2.6} />
+          </div>
+        </div>
+        <div>
+          <div className="metric-tile-value">
+            {activeRoomsCount}{' '}
+            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1E293B' }}>
+              / {totalRoomsCount} Zones
+            </span>
+          </div>
+          <div className="metric-tile-sub">
+            <span style={{ color: '#1E293B', fontWeight: 600 }}>Powered living spaces</span>
+          </div>
         </div>
       </div>
     </section>

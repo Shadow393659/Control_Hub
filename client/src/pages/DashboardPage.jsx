@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import Sidebar from '../components/layout/Sidebar';
+import TopRoomBar from '../components/dashboard/TopRoomBar';
 import StatsOverview from '../components/dashboard/StatsOverview';
 import ApplianceCard from '../components/dashboard/ApplianceCard';
+import PowerTelemetryGauge from '../components/dashboard/PowerTelemetryGauge';
+import ScheduleAlertPanel from '../components/dashboard/ScheduleAlertPanel';
 import AddDeviceModal from '../components/dashboard/AddDeviceModal';
-import RoomFilter from '../components/dashboard/RoomFilter';
-import { Plus, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import SettingsModal from '../components/dashboard/SettingsModal';
+import { SlidersHorizontal, Plus, RefreshCw, Zap, Clock } from 'lucide-react';
 import {
   fetchAppliances,
   toggleApplianceStatus,
@@ -16,11 +20,19 @@ import {
 export default function DashboardPage() {
   const [appliances, setAppliances] = useState(INITIAL_DUMMY_DEVICES);
   const [selectedRoom, setSelectedRoom] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeNavTab, setActiveNavTab] = useState('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isBackendOnline, setIsBackendOnline] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+  const [isBackendOnline, setIsBackendOnline] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch data
+  const schedulerRef = useRef(null);
+  const telemetryRef = useRef(null);
+  const devicesRef = useRef(null);
+
+  // Load telemetry data from API or localStorage
   const loadData = async () => {
     setIsLoading(true);
     try {
@@ -32,7 +44,7 @@ export default function DashboardPage() {
         setAppliances(result.data);
       }
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
+      console.error('Failed to load telemetry data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -42,22 +54,94 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  // Compute stats
+  // Listen for global navbar search or add events if triggered elsewhere
+  useEffect(() => {
+    const handleNavbarSearch = (e) => {
+      setSearchQuery(e.detail?.query || '');
+    };
+    const handleNavbarAdd = () => {
+      setIsAddModalOpen(true);
+    };
+
+    window.addEventListener('controlhub-search', handleNavbarSearch);
+    window.addEventListener('controlhub-open-add-device', handleNavbarAdd);
+
+    return () => {
+      window.removeEventListener('controlhub-search', handleNavbarSearch);
+      window.removeEventListener('controlhub-open-add-device', handleNavbarAdd);
+    };
+  }, []);
+
+  // Sidebar Navigation Action Dispatcher
+  const handleNavTabChange = (tabId) => {
+    setActiveNavTab(tabId);
+
+    if (tabId === 'dashboard') {
+      setSelectedRoom('all');
+      setSearchQuery('');
+      setIsAlertsOpen(false);
+      devicesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tabId === 'analytics') {
+      setIsAlertsOpen(false);
+      telemetryRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tabId === 'devices') {
+      setSelectedRoom('all');
+      setIsAlertsOpen(false);
+      devicesRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tabId === 'scheduler') {
+      setIsAlertsOpen(false);
+      schedulerRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else if (tabId === 'alerts') {
+      setIsAlertsOpen((prev) => !prev);
+    } else if (tabId === 'settings') {
+      setIsSettingsOpen(true);
+    }
+  };
+
+  // Compute metrics
   const totalDevices = appliances.length;
   const activeDevices = appliances.filter((a) => a.status).length;
   const totalPower = appliances
     .filter((a) => a.status)
-    .reduce((sum, a) => sum + (Number(a.powerUsage) || 0), 0);
+    .reduce((sum, a) => {
+      const wattage = Number(a.powerUsage) || 0;
+      const intensityFactor = a.intensity !== undefined ? (0.3 + 0.7 * (a.intensity / 100)) : 1;
+      return sum + Math.round(wattage * intensityFactor);
+    }, 0);
 
-  // Extract unique rooms
-  const uniqueRooms = Array.from(new Set(appliances.map((a) => a.room).filter(Boolean)));
+  // Multi-tier filtering: Room + Search Query + Analytics Mode
+  const filteredAppliances = appliances.filter((appliance) => {
+    // Analytics view mode: highlight high-draw or active drawing appliances
+    if (activeNavTab === 'analytics') {
+      if (!appliance.status && (Number(appliance.powerUsage) || 0) < 500) {
+        return false;
+      }
+    }
 
-  // Filtered list
-  const filteredAppliances = selectedRoom === 'all'
-    ? appliances
-    : appliances.filter((a) => a.room?.toLowerCase() === selectedRoom.toLowerCase());
+    // 1. Room filter
+    if (selectedRoom !== 'all') {
+      const appRoom = (appliance.room || '').toLowerCase();
+      const targetRoom = selectedRoom.toLowerCase();
+      if (targetRoom === 'bedroom') {
+        if (!appRoom.includes('bedroom')) return false;
+      } else if (!appRoom.includes(targetRoom) && appRoom !== targetRoom) {
+        return false;
+      }
+    }
 
-  // Handlers
+    // 2. Search Query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchName = (appliance.name || '').toLowerCase().includes(q);
+      const matchRoom = (appliance.room || '').toLowerCase().includes(q);
+      const matchType = (appliance.type || '').toLowerCase().includes(q);
+      if (!matchName && !matchRoom && !matchType) return false;
+    }
+
+    return true;
+  });
+
+  // Toggle appliance status
   const handleToggle = async (id, currentStatus) => {
     setAppliances((prev) =>
       prev.map((a) => (a._id === id ? { ...a, status: !currentStatus } : a))
@@ -65,6 +149,14 @@ export default function DashboardPage() {
     await toggleApplianceStatus(id, currentStatus);
   };
 
+  // Intensity slider adjustments
+  const handleIntensityChange = (id, intensity) => {
+    setAppliances((prev) =>
+      prev.map((a) => (a._id === id ? { ...a, intensity, status: intensity > 0 } : a))
+    );
+  };
+
+  // Add new device
   const handleAddAppliance = async (newDevice) => {
     const res = await createAppliance(newDevice);
     if (res.data) {
@@ -72,101 +164,215 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    setAppliances((prev) => prev.filter((a) => a._id !== id));
-    await deleteAppliance(id);
+  // Delete device
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Are you sure you want to remove "${name}" from ControlHub?`)) {
+      setAppliances((prev) => prev.filter((a) => a._id !== id));
+      await deleteAppliance(id);
+    }
   };
 
   return (
-    <div className="page-container">
-      {/* Dashboard Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 700, letterSpacing: '-0.02em', marginBottom: '0.25rem' }}>
-            Smart Home Control Panel
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.925rem' }}>
-            Live status and remote switching for connected smart devices
-          </p>
-        </div>
+    <div className="dashboard-shell">
+      <div className="dashboard-layout">
+        {/* 1. Left Slim Icon Sidebar Navigation */}
+        <Sidebar
+          activeTab={activeNavTab}
+          onTabChange={handleNavTabChange}
+          unreadAlertsCount={2}
+          isOnline={isBackendOnline}
+        />
 
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={loadData}
-            className="btn btn-secondary"
-            title="Refresh devices"
-          >
-            <RefreshCw size={16} className={isLoading ? 'spin' : ''} />
-            <span>Sync</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="btn btn-primary"
-          >
-            <Plus size={16} />
-            <span>Add Appliance</span>
-          </button>
-        </div>
-      </div>
+        {/* 2. Main Frosted Glassmorphism Content Area */}
+        <main className="vision-main" role="main">
+          {/* Top Room Navigation Bar with Z-Index 100 Stacking Context */}
+          <TopRoomBar
+            selectedRoom={selectedRoom}
+            onSelectRoom={setSelectedRoom}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onOpenAddDevice={() => setIsAddModalOpen(true)}
+            unreadCount={2}
+            isAlertsOpen={isAlertsOpen}
+            onToggleAlerts={setIsAlertsOpen}
+          />
 
-      {/* Stats Overview Bar */}
-      <StatsOverview
-        totalDevices={totalDevices}
-        activeDevices={activeDevices}
-        totalPower={totalPower}
-        isOnline={isBackendOnline}
-      />
+          {/* Top Metric Widget Ribbon with High-Contrast Dark Slate Text */}
+          <StatsOverview
+            appliances={appliances}
+            totalDevices={totalDevices}
+            activeDevices={activeDevices}
+            totalPower={totalPower}
+            isOnline={isBackendOnline}
+            onSync={loadData}
+            isSyncing={isLoading}
+          />
 
-      {/* Room Category Tabs */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Device Grid</h2>
-        <RoomFilter
-          rooms={uniqueRooms}
-          selectedRoom={selectedRoom}
-          onSelectRoom={setSelectedRoom}
+          {/* 2-Column Content Split: Devices Grid on Left, Gauge & Schedules on Right */}
+          <div className="dashboard-content-grid">
+            {/* Left Column: Device Control Cards */}
+            <section className="devices-section-col" ref={devicesRef}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.25rem 0.5rem',
+                }}
+              >
+                <div>
+                  <h2
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#0F172A',
+                      letterSpacing: '-0.025em',
+                      textShadow: '0 1px 1px rgba(255, 255, 255, 0.6)',
+                    }}
+                  >
+                    {activeNavTab === 'analytics'
+                      ? 'High-Power Draw Telemetry'
+                      : selectedRoom === 'all'
+                      ? 'All Active Devices'
+                      : `${selectedRoom.toUpperCase()} APPLIANCES`}
+                  </h2>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#1E293B', marginTop: '0.1rem' }}>
+                    {filteredAppliances.length} smart devices monitored in real time
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {activeNavTab === 'analytics' && (
+                    <span
+                      style={{
+                        fontSize: '0.725rem',
+                        fontWeight: 700,
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '9999px',
+                        background: 'rgba(37, 99, 235, 0.15)',
+                        border: '1px solid rgba(37, 99, 235, 0.35)',
+                        color: '#1D4ED8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                      }}
+                    >
+                      <Zap size={12} strokeWidth={2.6} /> Analytics Filter
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={loadData}
+                    className="frosted-icon-btn"
+                    style={{ width: 36, height: 36, borderRadius: '10px' }}
+                    title="Refresh device statuses"
+                  >
+                    <RefreshCw size={15} className={isLoading ? 'spin' : ''} />
+                  </button>
+                </div>
+              </div>
+
+              {filteredAppliances.length === 0 ? (
+                <div
+                  className="glass-card"
+                  style={{
+                    textAlign: 'center',
+                    padding: '3.5rem 1.5rem',
+                    borderRadius: '20px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '16px',
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      color: '#0F172A',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 1rem',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
+                    }}
+                  >
+                    <SlidersHorizontal size={22} />
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', marginBottom: '0.35rem' }}>
+                    No matching smart appliances
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1E293B', maxWidth: '380px', margin: '0 auto 1.25rem' }}>
+                    No devices found matching &quot;{searchQuery || selectedRoom}&quot;. Reset your filters or register a new appliance.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.65rem', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRoom('all');
+                        setSearchQuery('');
+                        setActiveNavTab('dashboard');
+                      }}
+                      className="frosted-icon-btn"
+                      style={{ width: 'auto', padding: '0.5rem 1.15rem', borderRadius: '12px', fontSize: '0.825rem', fontWeight: 700 }}
+                    >
+                      Reset Filters
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddModalOpen(true)}
+                      className="vision-add-btn"
+                    >
+                      <Plus size={15} strokeWidth={2.6} />
+                      <span>Add Device</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="appliances-grid">
+                  {filteredAppliances.map((appliance) => (
+                    <ApplianceCard
+                      key={appliance._id}
+                      appliance={appliance}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onIntensityChange={handleIntensityChange}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Right Column: Telemetry Gauge & Automation / Alerts */}
+            <aside className="telemetry-sidebar-col" aria-label="Telemetry & Automations">
+              {/* Circular Dial Power Telemetry Gauge Widget */}
+              <div ref={telemetryRef} style={{ transition: 'all 0.3s ease' }}>
+                <PowerTelemetryGauge
+                  totalPower={totalPower}
+                  maxCapacity={3500}
+                  activeCount={activeDevices}
+                />
+              </div>
+
+              {/* Schedule & Alert Panel */}
+              <div ref={schedulerRef} style={{ transition: 'all 0.3s ease' }}>
+                <ScheduleAlertPanel />
+              </div>
+            </aside>
+          </div>
+        </main>
+
+        {/* Add Device Modal Dialog (Z-Index 2000) */}
+        <AddDeviceModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          onAdd={handleAddAppliance}
+        />
+
+        {/* Hub Settings Modal Dialog (Z-Index 2000) */}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
         />
       </div>
-
-      {/* Appliances Grid */}
-      {filteredAppliances.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-muted)' }}>
-          <SlidersHorizontal size={36} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-            No appliances found
-          </h3>
-          <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            No devices are currently registered under this room filter.
-          </p>
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="btn btn-primary btn-sm"
-          >
-            <Plus size={15} />
-            <span>Add First Device</span>
-          </button>
-        </div>
-      ) : (
-        <div className="grid-cards">
-          {filteredAppliances.map((appliance) => (
-            <ApplianceCard
-              key={appliance._id}
-              appliance={appliance}
-              onToggle={handleToggle}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Add Device Modal Dialog */}
-      <AddDeviceModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleAddAppliance}
-      />
     </div>
   );
 }

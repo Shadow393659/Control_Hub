@@ -7,7 +7,6 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   const handleRegister = (data) => {
-    // Placeholder registration action: in future connects with /api/users/register
     console.log('User registration:', data);
     navigate('/login');
   };
@@ -16,20 +15,40 @@ export default function RegisterPage() {
     <div className="page-container">
       <div className="auth-wrapper card">
         <div className="auth-header">
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-            <div className="brand-icon" style={{ width: 40, height: 40 }}>
-              <Cpu size={24} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+            <div
+              className="brand-icon"
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <Cpu size={22} strokeWidth={2.2} />
             </div>
           </div>
-          <h1>Create an Account</h1>
-          <p>Get started with smart appliance automation</p>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            Create an Account
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            Deploy unified IoT management across your facilities
+          </p>
         </div>
 
         <RegisterForm onSubmit={handleRegister} />
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+        <div
+          style={{
+            textAlign: 'center',
+            marginTop: '1.5rem',
+            paddingTop: '1.25rem',
+            borderTop: '1px solid var(--border-subtle)',
+            fontSize: '0.85rem',
+            color: 'var(--text-muted)',
+          }}
+        >
           Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--primary-text)', fontWeight: 600 }}>
+          <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>
             Sign in
           </Link>
         </div>

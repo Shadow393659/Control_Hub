@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function LoginForm({ onSubmit }) {
   const [formData, setFormData] = useState({
@@ -26,28 +25,26 @@ export default function LoginForm({ onSubmit }) {
     <form onSubmit={handleSubmit} className="auth-form">
       <div className="form-group">
         <label className="form-label" htmlFor="email">
-          Email Address
+          Work Email
         </label>
-        <div style={{ position: 'relative' }}>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            placeholder="name@example.com"
-            className="form-input"
-            value={formData.email}
-            onChange={handleChange}
-          />
-        </div>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          placeholder="admin@enterprise.com"
+          className="form-input"
+          value={formData.email}
+          onChange={handleChange}
+        />
       </div>
 
       <div className="form-group">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
           <label className="form-label" htmlFor="password" style={{ marginBottom: 0 }}>
             Password
           </label>
-          <a href="#forgot" style={{ fontSize: '0.8rem', color: 'var(--primary-text)' }}>
+          <a href="#forgot" style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>
             Forgot password?
           </a>
         </div>
@@ -66,10 +63,10 @@ export default function LoginForm({ onSubmit }) {
       <button
         type="submit"
         className="btn btn-primary"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem' }}
+        style={{ width: '100%', marginTop: '0.75rem', padding: '0.65rem' }}
       >
-        <span>Sign In to ControlHub</span>
-        <ArrowRight size={16} />
+        <span>Sign In to Console</span>
+        <ArrowRight size={15} strokeWidth={2.2} />
       </button>
     </form>
   );

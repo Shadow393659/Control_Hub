@@ -43,14 +43,14 @@ export default function RegisterForm({ onSubmit }) {
 
       <div className="form-group">
         <label className="form-label" htmlFor="register-email">
-          Email Address
+          Work Email
         </label>
         <input
           id="register-email"
           name="email"
           type="email"
           required
-          placeholder="jane@example.com"
+          placeholder="jane@enterprise.com"
           className="form-input"
           value={formData.email}
           onChange={handleChange}
@@ -66,7 +66,7 @@ export default function RegisterForm({ onSubmit }) {
           name="password"
           type="password"
           required
-          placeholder="At least 8 characters"
+          placeholder="Minimum 8 characters"
           className="form-input"
           value={formData.password}
           onChange={handleChange}
@@ -92,10 +92,10 @@ export default function RegisterForm({ onSubmit }) {
       <button
         type="submit"
         className="btn btn-primary"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem' }}
+        style={{ width: '100%', marginTop: '0.75rem', padding: '0.65rem' }}
       >
         <span>Create Account</span>
-        <ArrowRight size={16} />
+        <ArrowRight size={15} strokeWidth={2.2} />
       </button>
     </form>
   );

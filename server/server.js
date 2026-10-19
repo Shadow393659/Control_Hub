@@ -26,7 +26,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://client-one-wheat-21.vercel.app/'],
+  origin: ['http://localhost:5173', 'http://127.0.0.1:5173','https://client-one-wheat-21.vercel.app'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-email', 'X-User-Email'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

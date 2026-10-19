@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://control-hub-t13b.onrender.com';
+const API_BASE_URL = 'https://control-hub-t13b.onrender.com/api';
 
 // Create configured Axios instance
 export const api = axios.create({
